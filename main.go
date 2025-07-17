@@ -10,6 +10,13 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 )
 
+type repo struct {
+	branch   string
+	str      string
+	path     string
+	unstaged int
+}
+
 func main() {
 	// Get current directory
 	dir, err := os.Getwd()
@@ -22,11 +29,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	strs := []string{}
-	paths := []string{}
-	unstaged := []int{}
+	var repos []repo
 	// Check all subdirectories for .git
 	for _, subdir := range subdirs {
+		repoStruct := repo{}
 		if !subdir.IsDir() {
 			continue
 		}
@@ -38,7 +44,7 @@ func main() {
 			continue
 		}
 
-		paths = append(paths, subdirPath)
+		repoStruct.path = subdirPath
 
 		// Open the repository
 		repo, err := gogit.PlainOpen(subdirPath)
@@ -67,23 +73,36 @@ func main() {
 				unstagedCount++
 			}
 		}
-		unstaged = append(unstaged, unstagedCount)
+		repoStruct.unstaged = unstagedCount
 
-		strs = append(strs, fmt.Sprintf("uncommitted files: %d", unstagedCount))
+		// Get current branch
+		branch, err := repo.Head()
+		if err != nil {
+			fmt.Printf("Error getting current branch at %s: %v\n", subdirPath, err)
+			continue
+		}
+		repoStruct.branch = branch.Name().Short()
+
+		repoStruct.str = fmt.Sprintf("uncommitted files: %d", unstagedCount)
+		repos = append(repos, repoStruct)
 	}
 
 	maxlen := 0
-	for _, str := range paths {
-		if len(str) > maxlen {
-			maxlen = len(str)
+	for _, repo := range repos {
+		if len(repo.path) > maxlen {
+			maxlen = len(repo.path)
 		}
 	}
 
-	for i, str := range strs {
-		if unstaged[i] > 0 {
-			color.Red("%-*s    %s\n", maxlen, paths[i], str)
+	for _, repo := range repos {
+		if repo.unstaged > 0 {
+			color.Red("%-*s    %s\n", maxlen, repo.path, repo.str)
 		} else {
-			color.Green("%-*s    %s\n", maxlen, paths[i], str)
+			if repo.branch == "develop" {
+				color.Green("%-*s    %s\n", maxlen, repo.path, repo.str)
+			} else {
+				color.Yellow("%-*s    %s; branch: %s\n", maxlen, repo.path, repo.str, repo.branch)
+			}
 		}
 	}
 
