@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -17,7 +18,19 @@ type repo struct {
 	unstaged int
 }
 
+var (
+	showErrorsFlag = flag.Bool("e", false, "show errors")
+	defaultBranch  = flag.String("b", "develop", "default branch")
+)
+
+func printError(format string, a ...any) {
+	if *showErrorsFlag {
+		color.Red(format, a...)
+	}
+}
+
 func main() {
+	flag.Parse()
 	// Get current directory
 	dir, err := os.Getwd()
 	if err != nil {
@@ -40,7 +53,7 @@ func main() {
 		gitPath := filepath.Join(subdirPath, ".git")
 		_, err := os.Stat(gitPath)
 		if err != nil {
-			fmt.Printf("Not a git repository: %s\n", subdirPath)
+			printError("Not a git repository: %s\n", subdirPath)
 			continue
 		}
 
@@ -49,21 +62,21 @@ func main() {
 		// Open the repository
 		repo, err := gogit.PlainOpen(subdirPath)
 		if err != nil {
-			fmt.Printf("Error opening repository at %s: %v\n", subdirPath, err)
+			printError("Error opening repository at %s: %v\n", subdirPath, err)
 			continue
 		}
 
 		// Get working tree
 		worktree, err := repo.Worktree()
 		if err != nil {
-			fmt.Printf("Error getting worktree at %s: %v\n", subdirPath, err)
+			printError("Error getting worktree at %s: %v\n", subdirPath, err)
 			continue
 		}
 
 		// Get status
 		status, err := worktree.Status()
 		if err != nil {
-			fmt.Printf("Error getting status at %s: %v\n", subdirPath, err)
+			printError("Error getting status at %s: %v\n", subdirPath, err)
 			continue
 		}
 
@@ -78,7 +91,7 @@ func main() {
 		// Get current branch
 		branch, err := repo.Head()
 		if err != nil {
-			fmt.Printf("Error getting current branch at %s: %v\n", subdirPath, err)
+			printError("Error getting current branch at %s: %v\n", subdirPath, err)
 			continue
 		}
 		repoStruct.branch = branch.Name().Short()
@@ -98,7 +111,7 @@ func main() {
 		if repo.unstaged > 0 {
 			color.Red("%-*s    %s\n", maxlen, repo.path, repo.str)
 		} else {
-			if repo.branch == "develop" {
+			if repo.branch == *defaultBranch {
 				color.Green("%-*s    %s\n", maxlen, repo.path, repo.str)
 			} else {
 				color.Yellow("%-*s    %s; branch: %s\n", maxlen, repo.path, repo.str, repo.branch)
